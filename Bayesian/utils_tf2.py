@@ -11,7 +11,7 @@ from tensorflow.keras import Input # used to instantiate a Keras tensor
 from tensorflow.keras.layers import Dense, Lambda, \
                                     InputLayer, Activation, Reshape
 from tensorflow.keras.layers import BatchNormalization
-from tensorflow.keras.layers import Conv2D, Deconv2D
+from tensorflow.keras.layers import Conv2D, Conv2DTranspose
 from tensorflow.keras import Model, Sequential
 from tensorflow.keras import backend as K
 from tensorflow.keras import metrics
@@ -64,7 +64,7 @@ def create_encoder(input_dims, base_filters=64, layers=4, latent=512):
     encoder.add(InputLayer(input_dims))
     for i in range(layers):
         encoder.add(Conv2D(filters=base_filters*2**i, kernel_size=(5, 5),
-                           strides=(2, 2), padding='same', bias=False))
+                           strides=(2, 2), padding='same', use_bias=False))
         encoder.add(BatchNormalization(axis=3))
         encoder.add(Activation(K.relu))
     encoder.add(Reshape([w*h*c]))
@@ -81,12 +81,13 @@ def create_decoder(output_dims, base_filters=64, layers=4, latent=512):
     decoder.add(Dense(w*h*c))
     decoder.add(Reshape([w, h, c]))
     for i in range(layers-1, 0, -1):
-        decoder.add(Deconv2D(filters=base_filters*2**i, kernel_size=(5, 5),
-                             strides=(2, 2), padding='same', bias=False))
+        decoder.add(Conv2DTranspose(filters=base_filters*2**i, 
+                                    kernel_size=(5, 5),
+                                    strides=(2, 2), padding='same', use_bias=False))
         decoder.add(BatchNormalization(axis=3))
         decoder.add(Activation(K.relu))
-    decoder.add(Deconv2D(filters=3, kernel_size=(5, 5),
-                         strides=(2, 2), padding='same'))
+    decoder.add(Conv2DTranspose(filters=3, kernel_size=(5, 5),
+                                strides=(2, 2), padding='same'))
     return decoder
 
 
@@ -134,6 +135,6 @@ def create_vae(batch_size, base_filters=64, latent=8,
     loss = reconstruction_weight*loss_reconstruction + loss_KL
 
     vae = Model(x, reconstruction)
-    vae.compile(optimizer=keras.optimizers.Adam(lr=learning_rate),
+    vae.compile(optimizer=tf.keras.optimizers.Adam(lr=learning_rate),
                 loss=lambda x, y: loss)
     return vae, encoder, decoder
